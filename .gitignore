@@ -1,0 +1,37 @@
+# Entorno virtual
+.venv/
+venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Django
+db.sqlite3
+media/
+staticfiles/
+*.log
+
+# Variables de entorno
+.env
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Migrations temporales (NO borrar migrations reales)
+*.pyc
+
+# Coverage / testing
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Node (por si algún día)
+node_modules/

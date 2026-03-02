@@ -234,8 +234,9 @@ def _estado_esperando_hora(conv: Conversacion, texto: str) -> str:
 
     hora_fin = calcular_hora_fin(d, hora_inicio, servicio.duracion_minutos)
 
-    # Crear reserva (pendiente pago)
+    # Crear reserva + pago
     from apps.pagos.models import Pago  # import local para evitar ciclos
+    from apps.pagos.services import crear_preferencia_mp
 
     with transaction.atomic():
         reserva = Reserva.objects.create(
@@ -254,8 +255,16 @@ def _estado_esperando_hora(conv: Conversacion, texto: str) -> str:
             external_reference=str(reserva.id),
         )
 
-    # En v1 del engine: si todavía no integraste MP, mandamos texto placeholder
-    # Cuando implementes pagos/services.py, acá lo reemplazamos para crear init_point y guardarlo.
+    # Crear preferencia en MercadoPago y guardar init_point
+    try:
+        pago = crear_preferencia_mp(pago)
+    except Exception:
+        # Si falla MP, cancelamos la reserva y volvemos al menú
+        reserva.marcar_cancelada()
+        resetear_conversacion(conv)
+        return "No pude generar el link de pago ahora. Intentá nuevamente más tarde.\n\n" + MENU_TEXTO
+
+    # Pasamos a estado esperando pago
     conv.estado = ConversacionEstado.ESPERANDO_PAGO
     conv.datos = {"reserva_id": reserva.id}
     conv.save(update_fields=["estado", "datos", "ultima_interaccion", "actualizado"])
@@ -263,17 +272,10 @@ def _estado_esperando_hora(conv: Conversacion, texto: str) -> str:
     fecha_h = d.strftime("%d/%m/%Y")
     hora_h = hora_inicio.strftime("%H:%M")
 
-    if pago.init_point:
-        return (
-            f"Turno reservado para {fecha_h} a las {hora_h}.\n"
-            f"Para confirmar, pagá acá:\n{pago.init_point}\n\n"
-            "Cuando el pago se apruebe, queda confirmado ✅"
-        )
-
     return (
         f"Turno reservado para {fecha_h} a las {hora_h}.\n"
-        "Paso siguiente: link de pago (MercadoPago) aún no está configurado en este ambiente.\n\n"
-        "Escribí MENU para volver."
+        f"Para confirmar, pagá acá:\n{pago.init_point}\n\n"
+        "Cuando el pago se apruebe, queda confirmado ✅"
     )
 
 
